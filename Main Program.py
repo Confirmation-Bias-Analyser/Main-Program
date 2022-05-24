@@ -37,9 +37,13 @@ with open('Authentication/database_uri.txt', 'r', encoding="utf8") as f:
     uri = f.read()
 
 
+print("\n************ Welcome to Confirmation Bias Analyser ************\n")
+
 # # Data Collection
 
 # ## Read the data and present as a dataframe
+
+overall_results_str = ""
 
 tweets_for_analysis = ['1522931750451617793', '1507922082683793408', '553553331671408641']
 
@@ -60,14 +64,12 @@ if tweetOption == 0 or tweetOption == 1:
     df = getData(query, uri)
 
     parent = df['head_id'][0]
-
-    print('About the tweet:')
-    print(getSingleTweetInfo(conversationID, header)['data'][0]['text'])
-
-    print('Number of comments:', len(df))
+    
+    overall_results_str += 'About the tweet:' + '\n' + getSingleTweetInfo(conversationID, header)['data'][0]['text'] + '\n' + 'Number of comments: ' + str(len(df)) + '\n'
+    print(overall_results_str)
 
 elif tweetOption == 2:
-    conversationID = tweets_for_analysis[tweetOption]
+    parent = tweets_for_analysis[tweetOption]
 
     query = '''
         select * from pheme_dataset_for_analysis where head_id = '%s'
@@ -75,11 +77,15 @@ elif tweetOption == 2:
 
     df = getData(query, uri)
 
-    print('Number of comments:', len(df))
+    overall_results_str += 'Number of comments:' + str(len(df)) + '\n'
+    print(overall_results_str)
+    
     
 # Create directory to save all results
-if os.path.isfile(tweets_for_analysis[tweetOption]):
-    os.mkdir(tweets_for_analysis[tweetOption])
+newDirectory = f"Results/{tweets_for_analysis[tweetOption]}/"
+
+if tweets_for_analysis[tweetOption] not in os.listdir("Results/"):
+    os.mkdir(newDirectory)
     
 df['url'] = df['comment'].apply(lambda x: getLinks(x))
 df['link_title'] = df['url'].apply(lambda x: getURLfromList(x))
@@ -214,47 +220,54 @@ df['topic_cluster'] = getClusters(pred_sentences, embedder)
 
 df['potential_bias'] = flagPotentialBias(df)
 
-df.to_csv(f'{tweets_for_analysis[tweetOption]}/sentiment_result.csv', index=False)
+df.to_csv(f'{newDirectory}/sentiment_result.csv', index=False)
 
 # # Confirmation Bias Analysis
 
 head_thread = parent #input('Enter a comment to look at the replies. ')
 conversationDF, conversationTree = traceConversation(df, root, head_thread, False)
 
-
-print("About the tweet\n")
-
-print("Existence of links:")
+about_str = "\nDetails of tweet\n" + "Existence of links:\n"
 checkLink = False
 
 for i in df['link_title']:
     if isinstance(i, list):
-        print(i)
+        about_str += str(i) + '\n'
         checkLink = False
 
 if checkLink:
-    print("No links")
+    about_str += "No links" + '\n'
 
 else:
     print("\nThe exact link in the comments:")
+    about_str += "\nThe exact link in the comments:" + '\n'
+    
     for i in df['url']:
         if len(i) > 0:
-            print(i)
+            about_str += str(i) + '\n'
+
+print(about_str)
+overall_results_str += about_str
 
 print("Conversation Tree")
 printGraph(root)
-DotExporter(root).to_dotfile(f'{tweets_for_analysis[tweetOption]}/tree_of_comments.dot')
-render('dot', 'jpg', f'{tweets_for_analysis[tweetOption]}/tree_of_comments.dot')
+DotExporter(root).to_dotfile(f'{newDirectory}/tree_of_comments.dot')
+render('dot', 'jpg', f'{newDirectory}/tree_of_comments.dot')
 
 # ## Results of confirmation bias analysis
 
-print("Confirmation Bias Score for Entire Conversation:", calculateBias(conversationDF))
-print("Number of potentially bias comments:", len(conversationDF[conversationDF['potential_bias'] == 1]))
+overall_results_str += "\nConfirmation Bias Analysis\n"
+
+cb_result_str = "\nConfirmation Bias Score for Entire Conversation:" + str(calculateBias(conversationDF)) + '\n' + "Number of potentially bias comments:" + str(len(conversationDF[conversationDF['potential_bias'] == 1]))
+print(cb_result_str)
+overall_results_str += cb_result_str
 
 # ## List of potentially bias comments
 
+overall_results_str += "\n\nPotentially biased comments (user id and comment):\n"
 for index, row in conversationDF[conversationDF['potential_bias'] == 1].iterrows():
-    print(row['id'], row['comment'])
+    overall_results_str += str(row['id']) + str(row['comment']) + '\n'
+#     print(row['id'], row['comment'])
 
 # # Results Verification
 
@@ -300,7 +313,7 @@ elif tweetOption == 1:
         print()
 
 if len(replies_retweets_result_str) > 0:
-    with open(f'{tweets_for_analysis[tweetOption]}/replies_and_retweets.txt', 'w', encoding="utf-8") as f:
+    with open(f'{newDirectory}/replies_and_retweets.txt', 'w', encoding="utf-8") as f:
         f.write(replies_retweets_result_str)
 
 
@@ -340,7 +353,7 @@ elif tweetOption == 1:
         print()
 
 if len(liked_tweets_result_str) > 0:
-    with open(f'{tweets_for_analysis[tweetOption]}/liked_tweets.txt', 'w', encoding="utf-8") as f:
+    with open(f'{newDirectory}/liked_tweets.txt', 'w', encoding="utf-8") as f:
         f.write(liked_tweets_result_str)
 
 # # Results Visualisation
@@ -350,19 +363,19 @@ if len(liked_tweets_result_str) > 0:
 polarity_map, subjectivity_map, pb_map = getColourNodes(conversationDF)
 
 net = createInterativeNetworkGraph(conversationTree, head_thread, polarity_map, overall_polarity_scores)
-net.show(f'{tweets_for_analysis[tweetOption]}/polarity_scores_graph.html')
+net.show(f'{newDirectory}/polarity_scores_graph.html')
 print('Polarity Scores')
 print('Legend: Green - Positive polarity,', 'Pink - Negative polarity,', 'Yellow - Neutral or Unknown')
 
 
 net = createInterativeNetworkGraph(conversationTree, head_thread, subjectivity_map, overall_subjectivity_scores)
-net.show(f'{tweets_for_analysis[tweetOption]}/subjectivity_scores_graph.html')
+net.show(f'{newDirectory}/subjectivity_scores_graph.html')
 print('Subjectivity Scores')
 print('Legend: Light Grey - Subjective comment,', 'Light Blue - Objective comment,', 'Orange - Unknown')
 
 
 net = createInterativeNetworkGraph(conversationTree, head_thread, pb_map, [])
-net.show(f'{tweets_for_analysis[tweetOption]}/potential_bias_users_graph.html')
+net.show(f'{newDirectory}/potential_bias_users_graph.html')
 print('Legend: Red - Potential Bias,', 'Black - Potential Unbias')
 
 
@@ -385,7 +398,7 @@ ax2 = fig.add_subplot(212)
 ax2.title.set_text("Results of text clustering")
 ax2.pie(topic_cluster_counts.values, labels=topic_cluster_counts.index, autopct='%1.1f%%', startangle=270)
 
-fig.savefig(f'{tweets_for_analysis[tweetOption]}/pie_charts_polarity_and_text_clustering.png')
+fig.savefig(f'{newDirectory}/pie_charts_polarity_and_text_clustering.png')
 
 # Wordcloud with positive tweets
 positive_tweets = []
@@ -425,7 +438,11 @@ plt.subplots_adjust(left=0.1,
                     wspace=0.4, 
                     hspace=0.4)
 
-fig.savefig(f'{tweets_for_analysis[tweetOption]}/wordcloud_for_positive_and_negative_sentiments.png')
+fig.savefig(f'{newDirectory}/wordcloud_for_positive_and_negative_sentiments.png')
+
+
+with open(f'{newDirectory}/overall_results.txt', 'w', encoding="utf-8") as f:
+    f.write(overall_results_str)
 
 
 # scoreLists = ['number_of_links', 'vader_compound_score', 'textblob_polarity', 'textblob_subjectivity', 'model_subjectivity', 'overall_subjectivity', 'overall_polarity', 'topic_cluster', 'potential_bias']
