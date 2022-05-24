@@ -1,0 +1,5 @@
+.ipynb_checkpoints
+.git
+__pycache__
+saved_subjectivity_model
+subjectivity_tokenizer
