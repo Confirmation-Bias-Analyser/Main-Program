@@ -1,7 +1,7 @@
 ############# Results Verification #############
 
-from data_collection_functions import *
-from confirmation_bias_model_functions import *
+from Functions.data_collection_functions import *
+from Functions.confirmation_bias_model_functions import *
 import re
 
 def obtainTweetsAndLikes(userID, header):
